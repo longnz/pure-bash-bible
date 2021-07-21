@@ -9,11 +9,24 @@ Alternative to the `dirname` command.
 ```sh
 dirname() {
     # Usage: dirname "path"
-    dir=${1%%/}
-    [[ "${dir##*/*}" ]] && dir=.
-    dir=${dir%/*}
+    local tmp=${1:-.}
 
-    printf '%s\n' "${dir:-/}"
+    [[ $tmp != *[!/]* ]] && {
+        printf '/\n'
+        return
+    }
+
+    tmp=${tmp%%"${tmp##*[!/]}"}
+
+    [[ $tmp != */* ]] && {
+        printf '.\n'
+        return
+    }
+
+    tmp=${tmp%/*}
+    tmp=${tmp%%"${tmp##*[!/]}"}
+
+    printf '%s\n' "${tmp:-/}"
 }
 ```
 
@@ -35,9 +48,14 @@ Alternative to the `basename` command.
 
 ```sh
 basename() {
-    # Usage: basename "path"
-    : "${1%/}"
-    printf '%s\n' "${_##*/}"
+    # Usage: basename "path" ["suffix"]
+    local tmp
+
+    tmp=${1%"${1##*[!/]}"}
+    tmp=${tmp##*/}
+    tmp=${tmp%"${2/"$tmp"}"}
+
+    printf '%s\n' "${tmp:-/}"
 }
 ```
 
@@ -46,6 +64,9 @@ basename() {
 ```shell
 $ basename ~/Pictures/Wallpapers/1.jpg
 1.jpg
+
+$ basename ~/Pictures/Wallpapers/1.jpg .jpg
+1
 
 $ basename ~/Pictures/Downloads/
 Downloads

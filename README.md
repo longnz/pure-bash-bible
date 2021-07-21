@@ -161,6 +161,7 @@ See something incorrectly described, buggy or outright wrong? Open an issue or s
     * [Bypass shell aliases](#bypass-shell-aliases)
     * [Bypass shell functions](#bypass-shell-functions)
     * [Run a command in the background](#run-a-command-in-the-background)
+    * [Capture function return without command substitution](#capture-the-return-value-of-a-function-without-command-substitution)
 * [AFTERWORD](#afterword)
 
 <!-- vim-markdown-toc -->
@@ -1070,11 +1071,24 @@ Alternative to the `dirname` command.
 ```sh
 dirname() {
     # Usage: dirname "path"
-    dir=${1%%/}
-    [[ "${dir##*/*}" ]] && dir=.
-    dir=${dir%/*}
+    local tmp=${1:-.}
 
-    printf '%s\n' "${dir:-/}"
+    [[ $tmp != *[!/]* ]] && {
+        printf '/\n'
+        return
+    }
+
+    tmp=${tmp%%"${tmp##*[!/]}"}
+
+    [[ $tmp != */* ]] && {
+        printf '.\n'
+        return
+    }
+
+    tmp=${tmp%/*}
+    tmp=${tmp%%"${tmp##*[!/]}"}
+
+    printf '%s\n' "${tmp:-/}"
 }
 ```
 
@@ -1096,9 +1110,14 @@ Alternative to the `basename` command.
 
 ```sh
 basename() {
-    # Usage: basename "path"
-    : "${1%/}"
-    printf '%s\n' "${_##*/}"
+    # Usage: basename "path" ["suffix"]
+    local tmp
+
+    tmp=${1%"${1##*[!/]}"}
+    tmp=${tmp##*/}
+    tmp=${tmp%"${2/"$tmp"}"}
+
+    printf '%s\n' "${tmp:-/}"
 }
 ```
 
@@ -1107,6 +1126,9 @@ basename() {
 ```shell
 $ basename ~/Pictures/Wallpapers/1.jpg
 1.jpg
+
+$ basename ~/Pictures/Wallpapers/1.jpg .jpg
+1
 
 $ basename ~/Pictures/Downloads/
 Downloads
@@ -1173,15 +1195,18 @@ Contrary to popular belief, there is no issue in utilizing raw escape sequences.
 
 ## Text Attributes
 
+**NOTE:** Prepend 2 to any code below to turn it's effect off
+(examples: 21=bold text off, 22=faint text off, 23=italic text off).
+
 | Sequence | What does it do? |
 | -------- | ---------------- |
-| `\e[m`  | Reset text formatting and colors.
+| `\e[m` | Reset text formatting and colors. |
 | `\e[1m` | Bold text. |
 | `\e[2m` | Faint text. |
 | `\e[3m` | Italic text. |
 | `\e[4m` | Underline text. |
-| `\e[5m` | Slow blink. |
-| `\e[7m` | Swap foreground and background colors. |
+| `\e[5m` | Blinking text. |
+| `\e[7m` | Highlighted text. |
 | `\e[8m` | Hidden text. |
 | `\e[9m` | Strike-through text. |
 
@@ -1550,12 +1575,15 @@ Use `#!/usr/bin/env bash` instead of `#!/bin/bash`.
 - The former searches the user's `PATH` to find the `bash` binary.
 - The latter assumes it is always installed to `/bin/` which can cause issues.
 
+**NOTE**: There are times when one may have a good reason for using `#!/bin/bash` or another direct path to the binary.
+
+
 ```shell
 # Right:
 
     #!/usr/bin/env bash
 
-# Wrong:
+# Less right:
 
     #!/bin/bash
 ```
@@ -2140,6 +2168,24 @@ bkr() {
 }
 
 bkr ./some_script.sh # some_script.sh is now running in the background
+```
+
+## Capture the return value of a function without command substitution
+
+**CAVEAT:** Requires `bash` 4+
+
+This uses local namerefs to avoid using `var=$(some_func)` style command substitution for function output capture.
+
+```sh
+to_upper() {
+  local -n ptr=${1}
+
+  ptr=${ptr^^}
+}
+
+foo="bar"
+to_upper foo
+printf "%s\n" "${foo}" # BAR
 ```
 
 <!-- CHAPTER END -->
